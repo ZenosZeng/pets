@@ -4,6 +4,8 @@
 
 一只安静常驻在桌面右下角的线条小狗桌宠。支持小白、小鸡毛，以及小白和小鸡毛一起出现。
 
+[⬇️ 下载 Windows 最新版](https://github.com/ZenosZeng/pets/releases/latest)
+
 ## 功能
 
 - 三种角色状态：小白、小鸡毛、小白 + 小鸡毛

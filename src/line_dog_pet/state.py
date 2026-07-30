@@ -1,4 +1,4 @@
-"""桌宠状态定义与切换逻辑。"""
+"""桌宠角色状态定义与切换逻辑。"""
 
 from __future__ import annotations
 

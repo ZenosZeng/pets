@@ -179,7 +179,7 @@ def main() -> int:
     if args.size <= 0:
         raise SystemExit("--size 必须为正整数")
 
-    assets_root = Path(__file__).resolve().parent / "assets"
+    assets_root = Path(__file__).resolve().parents[1] / "assets"
     paths = sorted(
         path
         for state in STATES

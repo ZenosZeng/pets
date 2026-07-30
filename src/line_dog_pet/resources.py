@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from pet_state import PetState
+from .state import PetState
 
 
 def project_root() -> Path:
@@ -16,7 +16,7 @@ def project_root() -> Path:
         if bundle_dir:
             return Path(bundle_dir)
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parents[2]
 
 
 def animation_directory(state: PetState) -> Path:

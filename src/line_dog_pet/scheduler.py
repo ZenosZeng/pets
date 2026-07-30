@@ -1,4 +1,4 @@
-"""桌宠待机动作与定时提醒调度。"""
+"""桌宠待机动作与定时提醒调度模块。"""
 
 from __future__ import annotations
 

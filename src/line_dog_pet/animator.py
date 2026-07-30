@@ -10,12 +10,12 @@ from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QBitmap, QImage, QImageReader, QMovie, QPixmap, QRegion
 from PySide6.QtWidgets import QLabel
 
-from pet_state import PetState
-from utils import (
+from .resources import (
     animation_directory,
     animation_paths,
     relative_asset_path,
 )
+from .state import PetState
 
 
 def fit_size(source_size: QSize, bounds: QSize) -> QSize:

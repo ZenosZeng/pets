@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from PySide6.QtCore import (  # noqa: E402
     QPoint,
@@ -17,13 +22,19 @@ from PySide6.QtCore import (  # noqa: E402
 from PySide6.QtGui import QColor, QImageReader, QPainter, QPixmap  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from pet_animator import fit_size, pixmap_hit_region  # noqa: E402
-from build_exe import pyinstaller_arguments, versioned_executable_name  # noqa: E402
-from pet_controller import PetController  # noqa: E402
-from pet_scheduler import PetScheduler, REMINDER_MESSAGES  # noqa: E402
-from pet_state import PetState  # noqa: E402
-from pet_window import PetWindow  # noqa: E402
-from utils import animation_paths  # noqa: E402
+from line_dog_pet.animator import fit_size, pixmap_hit_region  # noqa: E402
+from line_dog_pet.controller import PetController  # noqa: E402
+from line_dog_pet.resources import animation_paths  # noqa: E402
+from line_dog_pet.scheduler import (  # noqa: E402
+    REMINDER_MESSAGES,
+    PetScheduler,
+)
+from line_dog_pet.state import PetState  # noqa: E402
+from line_dog_pet.window import PetWindow  # noqa: E402
+from tools.build_exe import (  # noqa: E402
+    pyinstaller_arguments,
+    versioned_executable_name,
+)
 
 
 def main() -> int:
@@ -34,6 +45,8 @@ def main() -> int:
     assert executable_name == "v0.1.0-LineDogPet"
     build_arguments = pyinstaller_arguments(executable_name)
     assert build_arguments[build_arguments.index("--name") + 1] == executable_name
+    source_path = Path(build_arguments[build_arguments.index("--paths") + 1])
+    assert source_path == PROJECT_ROOT / "src"
     assert build_arguments[-1].endswith("main.py")
 
     pixmap = QPixmap(20, 20)

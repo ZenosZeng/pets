@@ -16,9 +16,9 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 
-from pet_animator import PetAnimator
-from pet_scheduler import REMINDER_MESSAGES
-from pet_state import PetState, random_switch_state
+from .animator import PetAnimator
+from .scheduler import REMINDER_MESSAGES
+from .state import PetState, random_switch_state
 
 
 class PetWindow(QWidget):

@@ -46,15 +46,17 @@ assets/together/*.gif
 
 ## 代码地图
 
-- `main.py`：QApplication 入口和启动资源检查。
-- `pet_controller.py`：托盘图标、QSettings、窗口与调度器协调。
-- `pet_scheduler.py`：随机待机计时和交替活动/喝水提醒。
-- `pet_window.py`：窗口属性、位置、鼠标和右键菜单。
-- `pet_animator.py`：扫描、随机选择、验证并播放 GIF。
-- `pet_state.py`：状态枚举和不重复的随机状态选择。
-- `utils.py`：源码/PyInstaller 路径解析和素材目录扫描。
-- `normalize_assets.py`：统一 GIF 透明画布、视觉尺寸和底部中心锚点。
-- `smoke_test.py`：离屏快速运行测试。
+- `main.py`：源码运行与 PyInstaller 的薄入口。
+- `src/line_dog_pet/app.py`：QApplication 入口和启动资源检查。
+- `src/line_dog_pet/controller.py`：托盘图标、QSettings、窗口与调度器协调。
+- `src/line_dog_pet/scheduler.py`：随机待机计时和交替活动/喝水提醒。
+- `src/line_dog_pet/window.py`：窗口属性、位置、鼠标和右键菜单。
+- `src/line_dog_pet/animator.py`：扫描、随机选择、验证并播放 GIF。
+- `src/line_dog_pet/state.py`：状态枚举和不重复的随机状态选择。
+- `src/line_dog_pet/resources.py`：源码/PyInstaller 路径解析和素材目录扫描。
+- `tools/normalize_assets.py`：统一 GIF 透明画布、视觉尺寸和底部中心锚点。
+- `tools/build_exe.py`：生成带手动版本前缀的 EXE。
+- `tests/smoke_test.py`：离屏快速集成测试。
 
 ## 常用命令
 

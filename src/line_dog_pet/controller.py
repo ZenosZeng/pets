@@ -12,10 +12,10 @@ from PySide6.QtWidgets import (
     QToolTip,
 )
 
-from pet_scheduler import PetScheduler
-from pet_state import PetState
-from pet_window import PetWindow
-from utils import animation_paths
+from .resources import animation_paths
+from .scheduler import PetScheduler
+from .state import PetState
+from .window import PetWindow
 
 
 class PetController(QObject):

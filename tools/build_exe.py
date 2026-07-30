@@ -8,7 +8,7 @@ from pathlib import Path
 
 import PyInstaller.__main__
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def non_negative_integer(value: str) -> int:
@@ -32,6 +32,8 @@ def pyinstaller_arguments(executable_name: str) -> list[str]:
         "--clean",
         "--windowed",
         "--onefile",
+        "--paths",
+        str(PROJECT_ROOT / "src"),
         "--name",
         executable_name,
         "--add-data",
