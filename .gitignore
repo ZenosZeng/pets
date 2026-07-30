@@ -1,0 +1,8 @@
+.venv/
+.pixi/
+__pycache__/
+*.py[cod]
+build/
+dist/
+backups/
+*.spec

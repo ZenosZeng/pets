@@ -1,0 +1,22 @@
+[workspace]
+name = "line-dog-pet"
+version = "0.1.0"
+description = "Windows desktop pet built with Python 3.11 and PySide6"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[dependencies]
+python = "3.11.*"
+
+[pypi-dependencies]
+pyside6 = ">=6.7,<7"
+pyinstaller = ">=6,<7"
+pillow = ">=11,<13"
+
+[tasks]
+start = "python main.py"
+check = "python -m py_compile main.py build_exe.py pet_controller.py pet_scheduler.py pet_window.py pet_animator.py pet_state.py utils.py smoke_test.py normalize_assets.py"
+smoke = "python smoke_test.py"
+normalize-assets = "python normalize_assets.py"
+build = "python build_exe.py"
+build-debug = 'pyinstaller --noconfirm --clean --onefile --name LineDogPet-debug --add-data "assets;assets" main.py'
