@@ -21,6 +21,16 @@ class PetState(str, Enum):
             PetState.TOGETHER: "小白 + 小鸡毛",
         }[self]
 
+    @property
+    def reminder_subject(self) -> str:
+        """返回当前场景用于提醒气泡的角色称呼。"""
+
+        return {
+            PetState.XIAOBAI: "小白",
+            PetState.XIAOJIMAO: "小鸡毛",
+            PetState.TOGETHER: "小白和小鸡毛一起",
+        }[self]
+
 
 def random_switch_state(
     current_state: PetState,

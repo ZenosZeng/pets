@@ -32,6 +32,8 @@ from line_dog_pet.scheduler import (  # noqa: E402
 from line_dog_pet.state import PetState  # noqa: E402
 from line_dog_pet.window import PetWindow  # noqa: E402
 from tools.build_exe import (  # noqa: E402
+    PYINSTALLER_HOOKS,
+    UNUSED_QT_MODULES,
     pyinstaller_arguments,
     versioned_executable_name,
 )
@@ -41,12 +43,19 @@ def main() -> int:
     app = QApplication([])
     app.setQuitOnLastWindowClosed(False)
 
-    executable_name = versioned_executable_name(0, 1, 0)
-    assert executable_name == "v0.1.0-LineDogPet"
+    executable_name = versioned_executable_name(0, 1, 1)
+    assert executable_name == "v0.1.1-LineDogPet"
     build_arguments = pyinstaller_arguments(executable_name)
     assert build_arguments[build_arguments.index("--name") + 1] == executable_name
     source_path = Path(build_arguments[build_arguments.index("--paths") + 1])
     assert source_path == PROJECT_ROOT / "src"
+    hooks_path = Path(
+        build_arguments[build_arguments.index("--additional-hooks-dir") + 1]
+    )
+    assert hooks_path == PYINSTALLER_HOOKS
+    assert build_arguments[build_arguments.index("--optimize") + 1] == "2"
+    for module_name in UNUSED_QT_MODULES:
+        assert module_name in build_arguments
     assert build_arguments[-1].endswith("main.py")
 
     pixmap = QPixmap(20, 20)
@@ -83,6 +92,18 @@ def main() -> int:
     assert canvas_size == QSize(154, 154)
     assert window.size() == canvas_size
     assert window._label.size() == canvas_size
+    assert window.scale_percent == PetWindow.DEFAULT_SCALE_PERCENT
+    assert PetWindow.normalize_scale_percent("113") == 110
+    assert PetWindow.normalize_scale_percent("invalid") == 100
+    context_menu = window._create_context_menu()
+    top_level_actions = {
+        action.text(): action for action in context_menu.actions()
+    }
+    for text in ("放大 10%", "缩小 10%", "恢复默认大小"):
+        assert text in top_level_actions
+        assert top_level_actions[text].menu() is None
+    assert "宠物大小" not in top_level_actions
+    context_menu.deleteLater()
 
     square_fit = fit_size(QSize(240, 240), canvas_size)
     portrait_fit = fit_size(QSize(143, 170), canvas_size)
@@ -99,6 +120,53 @@ def main() -> int:
     fixed_position = window.pos()
     fixed_size = window.size()
     assert not window._pending_hit_region.isEmpty()
+
+    scale_changes: list[int] = []
+    window.scale_changed.connect(scale_changes.append)
+    animation_before_scale = window.current_animation_path
+    bottom_center = QPoint(
+        window.x() + window.width() // 2,
+        window.y() + window.height(),
+    )
+    window.increase_scale()
+    app.processEvents()
+    enlarged_size = PetWindow.canvas_size_for_scale(110)
+    assert window.scale_percent == 110
+    assert window.size() == enlarged_size
+    assert window._label.size() == enlarged_size
+    assert window.current_animation_path == animation_before_scale
+    assert QPoint(
+        window.x() + window.width() // 2,
+        window.y() + window.height(),
+    ) == bottom_center
+    assert window._animator._movie is not None
+    assert (
+        window._animator._movie.currentPixmap().size()
+        == window._animator.current_render_size
+    )
+    assert window._animator.current_render_size.width() <= window.width()
+    assert window._animator.current_render_size.height() <= window.height()
+
+    window.decrease_scale()
+    app.processEvents()
+    assert window.scale_percent == 100
+    assert window.size() == fixed_size
+    assert window.pos() == fixed_position
+    assert scale_changes == [110, 100]
+
+    window.set_scale_percent(1)
+    assert window.scale_percent == PetWindow.MIN_SCALE_PERCENT
+    window.decrease_scale()
+    assert window.scale_percent == PetWindow.MIN_SCALE_PERCENT
+    window.set_scale_percent(999)
+    assert window.scale_percent == PetWindow.MAX_SCALE_PERCENT
+    window.increase_scale()
+    assert window.scale_percent == PetWindow.MAX_SCALE_PERCENT
+    window.reset_scale()
+    app.processEvents()
+    assert window.scale_percent == PetWindow.DEFAULT_SCALE_PERCENT
+    assert window.size() == fixed_size
+    assert window.pos() == fixed_position
 
     window.set_paused(True)
     assert window.is_paused
@@ -165,10 +233,36 @@ def main() -> int:
     settings = QSettings(str(settings_path), QSettings.Format.IniFormat)
     controller = PetController(app, settings=settings, tray_enabled=False)
     controller.start()
+    controller.window.set_scale_percent(130)
     controller.window.move(410, 310)
+
+    controller.window.switch_state(PetState.XIAOBAI)
+    controller.window.request_activity_reminder()
+    app.processEvents()
+    bubble = controller._reminder_bubble
+    assert bubble.isVisible()
+    assert bubble.message == f"小白提醒你：{REMINDER_MESSAGES[0]}"
+    assert bubble.y() < controller.window.y()
+    first_bubble_position = bubble.pos()
+
+    controller.window.move(430, 330)
+    app.processEvents()
+    assert bubble.pos() != first_bubble_position
+    controller.window.switch_state(PetState.XIAOJIMAO)
+    controller.window.request_water_reminder()
+    app.processEvents()
+    assert bubble.message == f"小鸡毛提醒你：{REMINDER_MESSAGES[1]}"
+
     controller.window.switch_state(PetState.TOGETHER)
+    controller.window.request_activity_reminder()
+    app.processEvents()
+    assert bubble.message == (
+        f"小白和小鸡毛一起提醒你：{REMINDER_MESSAGES[0]}"
+    )
+    controller.window.move(410, 310)
     controller.scheduler.set_reminders_enabled(False)
     controller.shutdown()
+    assert not bubble.isVisible()
     controller.window.close()
 
     restored_settings = QSettings(
@@ -184,6 +278,8 @@ def main() -> int:
     app.processEvents()
     assert restored.window.current_state == PetState.TOGETHER
     assert restored.window.pos() == QPoint(410, 310)
+    assert restored.window.scale_percent == 130
+    assert restored.window.size() == PetWindow.canvas_size_for_scale(130)
     assert not restored.scheduler.reminders_enabled
     restored.shutdown()
     restored.window.close()

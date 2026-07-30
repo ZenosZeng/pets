@@ -9,9 +9,9 @@ from PySide6.QtWidgets import (
     QMenu,
     QStyle,
     QSystemTrayIcon,
-    QToolTip,
 )
 
+from .reminder_bubble import ReminderBubble
 from .resources import animation_paths
 from .scheduler import PetScheduler
 from .state import PetState
@@ -35,9 +35,16 @@ class PetController(QObject):
         self._shutting_down = False
         self._tray: QSystemTrayIcon | None = None
         self._state_actions: dict[PetState, QAction] = {}
+        self._increase_scale_action: QAction | None = None
+        self._decrease_scale_action: QAction | None = None
+        self._reset_scale_action: QAction | None = None
 
-        self.window = PetWindow(initial_state=self._load_state())
+        self.window = PetWindow(
+            initial_state=self._load_state(),
+            initial_scale_percent=self._load_scale_percent(),
+        )
         self._restore_position()
+        self._reminder_bubble = ReminderBubble()
 
         self.scheduler = (
             scheduler if scheduler is not None else PetScheduler(parent=self)
@@ -53,7 +60,8 @@ class PetController(QObject):
         self.window.state_changed.connect(self._on_state_changed)
         self.window.paused_changed.connect(self._on_paused_changed)
         self.window.visibility_changed.connect(self._on_visibility_changed)
-        self.window.position_changed.connect(self._schedule_position_save)
+        self.window.position_changed.connect(self._on_position_changed)
+        self.window.scale_changed.connect(self._on_scale_changed)
         self.window.user_interacted.connect(self.scheduler.reset_idle_countdown)
         self.window.reminder_requested.connect(self._show_reminder)
 
@@ -86,12 +94,17 @@ class PetController(QObject):
         self._save_position()
         self._settings.setValue("pet/state", self.window.current_state.value)
         self._settings.setValue(
+            "window/scale_percent",
+            self.window.scale_percent,
+        )
+        self._settings.setValue(
             "reminders/enabled",
             self.scheduler.reminders_enabled,
         )
         self._settings.sync()
         if self._tray is not None:
             self._tray.hide()
+        self._reminder_bubble.stop()
         self.window.stop()
 
     def toggle_window(self) -> None:
@@ -107,6 +120,13 @@ class PetController(QObject):
             return PetState(str(value))
         except ValueError:
             return PetState.XIAOBAI
+
+    def _load_scale_percent(self) -> int:
+        value = self._settings.value(
+            "window/scale_percent",
+            PetWindow.DEFAULT_SCALE_PERCENT,
+        )
+        return PetWindow.normalize_scale_percent(value)
 
     def _restore_position(self) -> None:
         position = self._settings.value("window/position")
@@ -141,6 +161,19 @@ class PetController(QObject):
                 )
             )
             self._state_actions[state] = action
+
+        menu.addSeparator()
+        self._increase_scale_action = menu.addAction("放大 10%")
+        self._increase_scale_action.triggered.connect(
+            self.window.increase_scale
+        )
+        self._decrease_scale_action = menu.addAction("缩小 10%")
+        self._decrease_scale_action.triggered.connect(
+            self.window.decrease_scale
+        )
+        self._reset_scale_action = menu.addAction("恢复默认大小")
+        self._reset_scale_action.triggered.connect(self.window.reset_scale)
+        self._update_scale_actions()
 
         menu.addSeparator()
         self._reminder_action = menu.addAction("定时活动/喝水提醒")
@@ -202,7 +235,28 @@ class PetController(QObject):
     def _on_visibility_changed(self, visible: bool) -> None:
         if self._tray is not None:
             self._show_action.setText("隐藏桌宠" if visible else "显示桌宠")
+        if not visible:
+            self._reminder_bubble.hide()
         self._update_idle_enabled()
+
+    def _on_scale_changed(self, scale_percent: int) -> None:
+        self._settings.setValue("window/scale_percent", scale_percent)
+        self._reminder_bubble.reposition()
+        self._update_scale_actions()
+
+    def _update_scale_actions(self) -> None:
+        if self._increase_scale_action is None:
+            return
+        scale_percent = self.window.scale_percent
+        self._increase_scale_action.setEnabled(
+            scale_percent < PetWindow.MAX_SCALE_PERCENT
+        )
+        self._decrease_scale_action.setEnabled(
+            scale_percent > PetWindow.MIN_SCALE_PERCENT
+        )
+        self._reset_scale_action.setEnabled(
+            scale_percent != PetWindow.DEFAULT_SCALE_PERCENT
+        )
 
     def _update_idle_enabled(self) -> None:
         self.scheduler.set_idle_enabled(
@@ -214,22 +268,13 @@ class PetController(QObject):
         self._settings.setValue("reminders/enabled", enabled)
 
     def _show_reminder(self, message: str) -> None:
-        if self._tray is not None:
-            self._tray.showMessage(
-                "线条小狗提醒",
-                message,
-                QSystemTrayIcon.MessageIcon.Information,
-                8_000,
-            )
-            return
+        subject = self.window.current_state.reminder_subject
+        self._reminder_bubble.show_message(self.window, subject, message)
 
-        point = self.window.mapToGlobal(
-            QPoint(self.window.width() // 2, 0)
-        )
-        QToolTip.showText(point, message, self.window)
-
-    def _schedule_position_save(self, _position: QPoint) -> None:
+    def _on_position_changed(self, _position: QPoint) -> None:
         self._position_save_timer.start()
+        if self._reminder_bubble.isVisible():
+            self._reminder_bubble.reposition()
 
     def _save_position(self) -> None:
         self._settings.setValue("window/position", self.window.pos())

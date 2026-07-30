@@ -3,9 +3,9 @@
 ## 项目目标
 
 - Windows 本地桌面宠物，个人使用。
-- 当前手动维护版本为 `v0.1.0`；版本号同时体现在 `README.md` 和 `pixi.toml`。
+- 当前手动维护版本为 `v0.1.1`；版本号同时体现在 `README.md` 和 `pixi.toml`。
 - 不自动修改版本号；发布新版本时人工更新版本号、版本表和发布说明。
-- `pixi run build <major> <minor> <patch>` 仅使用传入版本命名产物，例如 `pixi run build 0 1 0` 生成 `dist/v0.1.0-LineDogPet.exe`。
+- `pixi run build <major> <minor> <patch>` 仅使用传入版本命名产物，例如 `pixi run build 0 1 1` 生成 `dist/v0.1.1-LineDogPet.exe`。
 - Python 3.11、PySide6、Pixi 管理环境。
 - 窗口透明、无边框、始终置顶，使用 `Qt.Tool` 避免任务栏按钮。
 - 保持实现小而清晰，不为简单功能引入复杂框架。
@@ -21,11 +21,13 @@
 - 无操作 20～60 秒后在当前状态内随机换动作；暂停或隐藏时停止待机换动作。
 - Windows 通知区域图标提供显示/隐藏、暂停、换动作、切换状态、提醒开关和退出。
 - 桌宠和托盘菜单均提供活动提醒、喝水提醒的即时测试入口。
+- 桌宠和托盘右键主菜单直接提供按 10% 放大、缩小和恢复默认大小三个操作，不使用缩放子菜单；缩放比例使用 `QSettings` 保存。
 - 使用 `QSettings` 保存位置、角色状态和提醒开关；无效的跨屏位置不得恢复。
 - GIF 每帧的不透明像素生成窗口遮罩，使透明画布区域点击穿透。
 - 启动 20 分钟后先提醒“记得站起来活动活动哦”，40 分钟后提醒“记得喝水”，之后每 20 分钟交替，因此每条提醒的周期都是 40 分钟。
+- 所有定时和测试提醒均显示为宠物上方的气泡；按当前场景使用“小白提醒你”“小鸡毛提醒你”或“小白和小鸡毛一起提醒你”，不调用 Windows 系统通知。
 - 损坏 GIF 应被跳过；没有可用 GIF 时显示占位内容。
-- 运行时窗口固定为 `154×154`（原 `220×220` 的 70%），切换动画时不得改变窗口尺寸或位置。
+- 默认窗口为 `154×154`（原 `220×220` 的 70%），支持在 50%～200% 范围内按 10% 缩放；切换动画时不得改变窗口尺寸或位置。
 - GIF 按原始宽高比自动适配到固定画布内，并在底部居中。
 
 ## 素材约定
@@ -50,12 +52,14 @@ assets/together/*.gif
 - `src/line_dog_pet/app.py`：QApplication 入口和启动资源检查。
 - `src/line_dog_pet/controller.py`：托盘图标、QSettings、窗口与调度器协调。
 - `src/line_dog_pet/scheduler.py`：随机待机计时和交替活动/喝水提醒。
+- `src/line_dog_pet/reminder_bubble.py`：绘制、定位并自动隐藏宠物上方的提醒气泡。
 - `src/line_dog_pet/window.py`：窗口属性、位置、鼠标和右键菜单。
 - `src/line_dog_pet/animator.py`：扫描、随机选择、验证并播放 GIF。
 - `src/line_dog_pet/state.py`：状态枚举和不重复的随机状态选择。
 - `src/line_dog_pet/resources.py`：源码/PyInstaller 路径解析和素材目录扫描。
 - `tools/normalize_assets.py`：统一 GIF 透明画布、视觉尺寸和底部中心锚点。
-- `tools/build_exe.py`：生成带手动版本前缀的 EXE。
+- `tools/build_exe.py`：生成带手动版本前缀的 EXE，并排除未使用的 Qt 模块。
+- `tools/pyinstaller_hooks/`：只保留 Windows、GIF 和原生窗口样式所需的 Qt 运行组件。
 - `tests/smoke_test.py`：离屏快速集成测试。
 
 ## 常用命令
@@ -65,7 +69,7 @@ pixi run start
 pixi run check
 pixi run smoke
 pixi run normalize-assets
-pixi run build 0 1 0
+pixi run build 0 1 1
 ```
 
 - 快速迭代时运行 `check` 和 `smoke`。

@@ -28,18 +28,28 @@ class PetWindow(QWidget):
     paused_changed = Signal(bool)
     visibility_changed = Signal(bool)
     position_changed = Signal(QPoint)
+    scale_changed = Signal(int)
     user_interacted = Signal()
     reminder_requested = Signal(str)
 
     CANVAS_SIZE = QSize(154, 154)
+    DEFAULT_SCALE_PERCENT = 100
+    MIN_SCALE_PERCENT = 50
+    MAX_SCALE_PERCENT = 200
+    SCALE_STEP_PERCENT = 10
     SCREEN_MARGIN = 24
 
     def __init__(
         self,
         initial_state: PetState = PetState.XIAOBAI,
+        initial_scale_percent: int = DEFAULT_SCALE_PERCENT,
     ) -> None:
         super().__init__()
         self._current_state = initial_state
+        self._scale_percent = self.normalize_scale_percent(
+            initial_scale_percent
+        )
+        self._canvas_size = self.canvas_size_for_scale(self._scale_percent)
         self._press_global_position: QPoint | None = None
         self._window_position_at_press = QPoint()
         self._dragged = False
@@ -55,10 +65,10 @@ class PetWindow(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
-        self.setFixedSize(self.CANVAS_SIZE)
+        self.setFixedSize(self._canvas_size)
 
         self._label = QLabel(self)
-        self._label.setFixedSize(self.CANVAS_SIZE)
+        self._label.setFixedSize(self._canvas_size)
         # 鼠标事件交给父窗口，保证图片区域可拖动、可点击。
         self._label.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents,
@@ -70,9 +80,30 @@ class PetWindow(QWidget):
         layout.setSpacing(0)
         layout.addWidget(self._label)
 
-        self._animator = PetAnimator(self._label, self.CANVAS_SIZE, self)
+        self._animator = PetAnimator(self._label, self._canvas_size, self)
         self._animator.hit_region_changed.connect(self._set_hit_region)
         self.switch_state(self._current_state)
+
+    @classmethod
+    def normalize_scale_percent(cls, value: object) -> int:
+        """Clamp a saved scale to a supported 10% step."""
+
+        try:
+            percent = int(value)
+        except (TypeError, ValueError):
+            percent = cls.DEFAULT_SCALE_PERCENT
+        step = cls.SCALE_STEP_PERCENT
+        percent = ((percent + step // 2) // step) * step
+        return min(cls.MAX_SCALE_PERCENT, max(cls.MIN_SCALE_PERCENT, percent))
+
+    @classmethod
+    def canvas_size_for_scale(cls, scale_percent: int) -> QSize:
+        """Return the pixel canvas for a normalized percentage."""
+
+        scale_percent = cls.normalize_scale_percent(scale_percent)
+        width = (cls.CANVAS_SIZE.width() * scale_percent + 50) // 100
+        height = (cls.CANVAS_SIZE.height() * scale_percent + 50) // 100
+        return QSize(width, height)
 
     @property
     def current_state(self) -> PetState:
@@ -85,6 +116,14 @@ class PetWindow(QWidget):
     @property
     def is_paused(self) -> bool:
         return self._user_paused
+
+    @property
+    def scale_percent(self) -> int:
+        return self._scale_percent
+
+    @property
+    def canvas_size(self) -> QSize:
+        return QSize(self._canvas_size)
 
     def switch_state(self, state: PetState) -> None:
         """立即切换到指定状态。"""
@@ -112,6 +151,45 @@ class PetWindow(QWidget):
         self._update_animation_playback()
         self.paused_changed.emit(paused)
 
+    def set_scale_percent(self, scale_percent: int) -> None:
+        """Resize around the pet's bottom center and keep it on-screen."""
+
+        scale_percent = self.normalize_scale_percent(scale_percent)
+        if scale_percent == self._scale_percent:
+            return
+
+        old_size = self.size()
+        anchor = QPoint(
+            self.x() + old_size.width() // 2,
+            self.y() + old_size.height(),
+        )
+        new_size = self.canvas_size_for_scale(scale_percent)
+        target = QPoint(
+            anchor.x() - new_size.width() // 2,
+            anchor.y() - new_size.height(),
+        )
+
+        self.clearMask()
+        self._scale_percent = scale_percent
+        self._canvas_size = QSize(new_size)
+        self.setFixedSize(new_size)
+        self._animator.set_canvas_size(new_size)
+        self.move(self._clamp_position_to_screen(target, new_size, anchor))
+        self.scale_changed.emit(scale_percent)
+
+    def increase_scale(self) -> None:
+        self.set_scale_percent(
+            self._scale_percent + self.SCALE_STEP_PERCENT
+        )
+
+    def decrease_scale(self) -> None:
+        self.set_scale_percent(
+            self._scale_percent - self.SCALE_STEP_PERCENT
+        )
+
+    def reset_scale(self) -> None:
+        self.set_scale_percent(self.DEFAULT_SCALE_PERCENT)
+
     def request_activity_reminder(self) -> None:
         self.reminder_requested.emit(REMINDER_MESSAGES[0])
 
@@ -121,7 +199,7 @@ class PetWindow(QWidget):
     def restore_position(self, position: QPoint) -> bool:
         """恢复仍位于任一可用屏幕内的位置。"""
 
-        target = QRect(position, self.CANVAS_SIZE)
+        target = QRect(position, self.size())
         screens = QApplication.screens()
         if not any(screen.availableGeometry().intersects(target) for screen in screens):
             return False
@@ -195,6 +273,14 @@ class PetWindow(QWidget):
         super().mouseReleaseEvent(event)
 
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        menu = self._create_context_menu()
+        menu.exec(event.globalPos())
+        menu.deleteLater()
+        event.accept()
+
+    def _create_context_menu(self) -> QMenu:
+        """Build the flat pet menu; separated for quick integration tests."""
+
         menu = QMenu(self)
         state_actions = (
             ("切换到小白", PetState.XIAOBAI),
@@ -218,6 +304,22 @@ class PetWindow(QWidget):
         pause_action.setChecked(self._user_paused)
         pause_action.triggered.connect(self.set_paused)
         menu.addSeparator()
+        increase_action = menu.addAction("放大 10%")
+        increase_action.setEnabled(
+            self._scale_percent < self.MAX_SCALE_PERCENT
+        )
+        increase_action.triggered.connect(self.increase_scale)
+        decrease_action = menu.addAction("缩小 10%")
+        decrease_action.setEnabled(
+            self._scale_percent > self.MIN_SCALE_PERCENT
+        )
+        decrease_action.triggered.connect(self.decrease_scale)
+        reset_action = menu.addAction("恢复默认大小")
+        reset_action.setEnabled(
+            self._scale_percent != self.DEFAULT_SCALE_PERCENT
+        )
+        reset_action.triggered.connect(self.reset_scale)
+        menu.addSeparator()
         activity_action = menu.addAction("测试活动提醒")
         activity_action.triggered.connect(self.request_activity_reminder)
         water_action = menu.addAction("测试喝水提醒")
@@ -229,8 +331,7 @@ class PetWindow(QWidget):
         quit_action = menu.addAction("退出程序")
         quit_action.triggered.connect(QApplication.quit)
 
-        menu.exec(event.globalPos())
-        event.accept()
+        return menu
 
     def closeEvent(self, event: QCloseEvent) -> None:
         super().closeEvent(event)
@@ -251,6 +352,26 @@ class PetWindow(QWidget):
     def _update_animation_playback(self) -> None:
         self._animator.set_paused(
             self._user_paused or not self.isVisible()
+        )
+
+    def _clamp_position_to_screen(
+        self,
+        position: QPoint,
+        size: QSize,
+        anchor: QPoint,
+    ) -> QPoint:
+        screen = QApplication.screenAt(anchor) or self.screen()
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        if screen is None:
+            return position
+
+        area = screen.availableGeometry()
+        max_x = max(area.x(), area.right() - size.width() + 1)
+        max_y = max(area.y(), area.bottom() - size.height() + 1)
+        return QPoint(
+            min(max(position.x(), area.x()), max_x),
+            min(max(position.y(), area.y()), max_y),
         )
 
     def _schedule_initial_position(self) -> None:

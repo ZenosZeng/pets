@@ -9,6 +9,15 @@ from pathlib import Path
 import PyInstaller.__main__
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PYINSTALLER_HOOKS = PROJECT_ROOT / "tools" / "pyinstaller_hooks"
+UNUSED_QT_MODULES = (
+    "PySide6.QtNetwork",
+    "PySide6.QtOpenGL",
+    "PySide6.QtPdf",
+    "PySide6.QtQml",
+    "PySide6.QtQuick",
+    "PySide6.QtSvg",
+)
 
 
 def non_negative_integer(value: str) -> int:
@@ -32,12 +41,21 @@ def pyinstaller_arguments(executable_name: str) -> list[str]:
         "--clean",
         "--windowed",
         "--onefile",
+        "--optimize",
+        "2",
         "--paths",
         str(PROJECT_ROOT / "src"),
+        "--additional-hooks-dir",
+        str(PYINSTALLER_HOOKS),
         "--name",
         executable_name,
         "--add-data",
         f"{PROJECT_ROOT / 'assets'}{os.pathsep}assets",
+        *[
+            argument
+            for module_name in UNUSED_QT_MODULES
+            for argument in ("--exclude-module", module_name)
+        ],
         str(PROJECT_ROOT / "main.py"),
     ]
 

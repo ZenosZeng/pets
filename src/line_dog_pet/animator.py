@@ -62,6 +62,7 @@ class PetAnimator(QObject):
         self._active_path: Path | None = None
         self._last_path_by_state: dict[PetState, Path] = {}
         self._failed_paths: set[Path] = set()
+        self._source_size = QSize()
         self._render_size = QSize()
         self._paused = False
         self._label.setFixedSize(self._canvas_size)
@@ -109,7 +110,13 @@ class PetAnimator(QObject):
             movie = QMovie(str(path))
             movie.setCacheMode(QMovie.CacheMode.CacheAll)
             if movie.isValid():
-                self._start_movie(state, path, movie, render_size)
+                self._start_movie(
+                    state,
+                    path,
+                    movie,
+                    source_size,
+                    render_size,
+                )
                 return
 
             print(f"[桌宠资源提示] GIF 无法读取: {path}", file=sys.stderr)
@@ -118,16 +125,60 @@ class PetAnimator(QObject):
 
         self._show_placeholder(state, directory, "目录中没有可读取的 GIF")
 
+    def set_canvas_size(self, canvas_size: QSize) -> None:
+        """Resize the canvas and current animation without changing its GIF."""
+
+        canvas_size = QSize(canvas_size)
+        if canvas_size.isEmpty() or canvas_size == self._canvas_size:
+            return
+
+        self._canvas_size = canvas_size
+        self._label.setFixedSize(canvas_size)
+        if (
+            self._movie is None
+            or self._active_path is None
+            or self._source_size.isEmpty()
+        ):
+            self._render_size = QSize(canvas_size)
+            self.hit_region_changed.emit(
+                QRegion(QRect(0, 0, canvas_size.width(), canvas_size.height()))
+            )
+            return
+
+        render_size = fit_size(self._source_size, canvas_size)
+        frame_number = max(0, self._movie.currentFrameNumber())
+        state = self._active_state
+        path = self._active_path
+        source_size = QSize(self._source_size)
+        replacement = QMovie(str(path))
+        replacement.setCacheMode(QMovie.CacheMode.CacheAll)
+        if not replacement.isValid():
+            replacement.deleteLater()
+            return
+
+        self._stop_movie()
+        self._start_movie(
+            state,
+            path,
+            replacement,
+            source_size,
+            render_size,
+        )
+        replacement.jumpToFrame(frame_number)
+        self._on_frame_changed(frame_number)
+
     def _start_movie(
         self,
         state: PetState,
         path: Path,
         movie: QMovie,
+        source_size: QSize,
         render_size: QSize,
     ) -> None:
         self._movie = movie
         self._active_path = path
         self._last_path_by_state[state] = path
+        self._source_size = QSize(source_size)
         self._render_size = QSize(render_size)
         self._label.clear()
         self._label.setStyleSheet("")
@@ -165,6 +216,7 @@ class PetAnimator(QObject):
         self._movie.deleteLater()
         self._movie = None
         self._active_path = None
+        self._source_size = QSize()
         self._render_size = QSize()
 
     def _on_frame_changed(self, _frame_number: int) -> None:
