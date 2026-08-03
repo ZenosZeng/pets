@@ -9,7 +9,7 @@ assets/
 │  ├─ laptop.gif
 │  └─ ...
 ├─ xiaojimao/
-│  ├─ corner.gif
+│  ├─ happy.gif
 │  └─ ...
 └─ together/
    ├─ cuddle.gif

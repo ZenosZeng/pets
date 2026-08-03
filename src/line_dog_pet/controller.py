@@ -269,7 +269,12 @@ class PetController(QObject):
 
     def _show_reminder(self, message: str) -> None:
         subject = self.window.current_state.reminder_subject
-        self._reminder_bubble.show_message(self.window, subject, message)
+        self._reminder_bubble.show_message(
+            self.window,
+            subject,
+            message,
+            dismissible=True,
+        )
 
     def _on_position_changed(self, _position: QPoint) -> None:
         self._position_save_timer.start()

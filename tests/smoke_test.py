@@ -242,6 +242,8 @@ def main() -> int:
     bubble = controller._reminder_bubble
     assert bubble.isVisible()
     assert bubble.message == f"小白提醒你：{REMINDER_MESSAGES[0]}"
+    assert bubble.dismissible
+    assert bubble._dismiss_button.isVisible()
     assert bubble.y() < controller.window.y()
     first_bubble_position = bubble.pos()
 
@@ -259,6 +261,11 @@ def main() -> int:
     assert bubble.message == (
         f"小白和小鸡毛一起提醒你：{REMINDER_MESSAGES[0]}"
     )
+    # 提醒气泡需点击"我知道啦"按钮才会关闭
+    assert bubble._dismiss_button.isVisible()
+    bubble._dismiss_button.click()
+    app.processEvents()
+    assert not bubble.isVisible()
     controller.window.move(410, 310)
     controller.scheduler.set_reminders_enabled(False)
     controller.shutdown()

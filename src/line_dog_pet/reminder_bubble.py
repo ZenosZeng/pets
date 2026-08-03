@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPaintEvent, QPen
-from PySide6.QtWidgets import QApplication, QLabel, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 
 class ReminderBubble(QWidget):
@@ -15,6 +15,8 @@ class ReminderBubble(QWidget):
     HORIZONTAL_PADDING = 16
     VERTICAL_PADDING = 12
     TAIL_HEIGHT = 13
+    BUTTON_HEIGHT = 30
+    BUTTON_GAP = 10
     SCREEN_MARGIN = 8
 
     def __init__(self) -> None:
@@ -27,12 +29,14 @@ class ReminderBubble(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        # 普通气泡默认鼠标穿透；提醒模式由 show_message 切换关闭
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self._anchor: QWidget | None = None
         self._tail_x = 0
         self._message = ""
+        self._dismissible = False
 
         self._label = QLabel(self)
         self._label.setWordWrap(True)
@@ -44,6 +48,21 @@ class ReminderBubble(QWidget):
         self._label.setFont(font)
         self._label.setStyleSheet("color: #3b3836; background: transparent;")
 
+        self._dismiss_button = QPushButton("我知道啦", self)
+        self._dismiss_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._dismiss_button.setStyleSheet(
+            "QPushButton {"
+            "  background: #ffd9a0; color: #3b3836;"
+            "  border: none; border-radius: 11px;"
+            "  font-family: 'Microsoft YaHei UI'; font-size: 10pt;"
+            "  padding: 2px 18px;"
+            "}"
+            "QPushButton:hover { background: #ffcd85; }"
+            "QPushButton:pressed { background: #ffc26e; }"
+        )
+        self._dismiss_button.clicked.connect(self.stop)
+        self._dismiss_button.hide()
+
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
         self._hide_timer.timeout.connect(self.hide)
@@ -52,23 +71,43 @@ class ReminderBubble(QWidget):
     def message(self) -> str:
         return self._message
 
+    @property
+    def dismissible(self) -> bool:
+        return self._dismissible
+
     def show_message(
         self,
         anchor: QWidget,
         subject: str,
         message: str,
         duration_ms: int = DISPLAY_MS,
+        dismissible: bool = False,
     ) -> None:
-        """Show a character-specific reminder and restart the hide timer."""
+        """Show a character-specific reminder.
+
+        Dismissible reminders stay visible until the "我知道啦" button is
+        clicked; other messages hide automatically after ``duration_ms``.
+        """
 
         self._anchor = anchor
+        self._dismissible = dismissible
         self._message = f"{subject}提醒你：{message}"
         self._label.setText(self._message)
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents,
+            not dismissible,
+        )
+        if dismissible:
+            self._dismiss_button.show()
+            self._hide_timer.stop()
+        else:
+            self._dismiss_button.hide()
         self._resize_to_text()
         self.reposition()
         self.show()
         self.raise_()
-        self._hide_timer.start(max(1, int(duration_ms)))
+        if not dismissible:
+            self._hide_timer.start(max(1, int(duration_ms)))
 
     def reposition(self) -> None:
         """Keep the bubble above the current pet position."""
@@ -156,10 +195,14 @@ class ReminderBubble(QWidget):
             max(120, text_rect.width() + 2),
         )
         text_height = max(24, text_rect.height() + 2)
+        extra = 0
+        if self._dismissible:
+            extra = self.BUTTON_GAP + self.BUTTON_HEIGHT
         width = text_width + self.HORIZONTAL_PADDING * 2
         height = (
             text_height
             + self.VERTICAL_PADDING * 2
+            + extra
             + self.TAIL_HEIGHT
         )
         self.setFixedSize(width, height)
@@ -169,3 +212,17 @@ class ReminderBubble(QWidget):
             text_width,
             text_height,
         )
+        if self._dismissible:
+            button_width = self._dismiss_button.sizeHint().width()
+            button_x = (width - button_width) // 2
+            button_y = (
+                self.VERTICAL_PADDING
+                + text_height
+                + self.BUTTON_GAP
+            )
+            self._dismiss_button.setGeometry(
+                button_x,
+                button_y,
+                button_width,
+                self.BUTTON_HEIGHT,
+            )
