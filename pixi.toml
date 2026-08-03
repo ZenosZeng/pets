@@ -1,6 +1,6 @@
 [workspace]
 name = "line-dog-pet"
-version = "0.1.1"
+version = "0.1.2"
 description = "Windows desktop pet built with Python 3.11 and PySide6"
 channels = ["conda-forge"]
 platforms = ["win-64"]
