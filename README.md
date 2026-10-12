@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/readme-cover.png" alt="Pets 线条小狗桌宠：桌面陪伴、活动提醒、喝水提醒" width="100%">
+</p>
+
 # 线条小狗桌宠
 
 > Windows 本地桌面宠物｜当前版本：`v0.1.2`
